@@ -19,21 +19,18 @@ namespace Infiniminer.Server
 
         static void Main(string[] args)
         {
-            if (System.Diagnostics.Debugger.IsAttached)
+#if !DEBUG
+            try
             {
+#endif
                 RunServer();
+#if !DEBUG
             }
-            else
+            catch (Exception e)
             {
-                try
-                {
-                    RunServer();
-                }
-                catch (Exception e)
-                {
-                    System.Windows.Forms.MessageBox.Show(e.Message + "\r\n\r\n" + e.StackTrace);
-                }
+                System.Windows.Forms.MessageBox.Show(e.Message + "\r\n\r\n" + e.StackTrace);
             }
+#endif
         }
     }
 }

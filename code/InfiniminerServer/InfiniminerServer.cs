@@ -14,7 +14,6 @@ namespace Infiniminer
         InfiniminerNetServer netServer = null;
         BlockType[, ,] blockList = null;    // In game coordinates, where Y points up.
         PlayerTeam[, ,] blockCreatorTeam = null;
-        const int MAPSIZE = 64;
         Dictionary<NetConnection, Player> playerList = new Dictionary<NetConnection, Player>();
         int lavaBlockCount = 0;
         uint oreFactor = 10;
@@ -254,9 +253,9 @@ namespace Infiniminer
                             {
                                 FileStream fs = new FileStream(args[1], FileMode.Open);
                                 StreamReader sr = new StreamReader(fs);
-                                for (int x = 0; x < 64; x++)
-                                    for (int y = 0; y < 64; y++)
-                                        for (int z = 0; z < 64; z++)
+                                for (int x = 0; x < GlobalVariables.MAPSIZE; x++)
+                                    for (int y = 0; y < GlobalVariables.MAPSIZE; y++)
+                                        for (int z = 0; z < GlobalVariables.MAPSIZE; z++)
                                         {
                                             string line = sr.ReadLine();
                                             string[] fileArgs = line.Split(",".ToCharArray());
@@ -286,9 +285,9 @@ namespace Infiniminer
         {
             FileStream fs = new FileStream(filename, FileMode.Create);
             StreamWriter sw = new StreamWriter(fs);
-            for (int x = 0; x < 64; x++)
-                for (int y = 0; y < 64; y++)
-                    for (int z = 0; z < 64; z++)
+            for (int x = 0; x < GlobalVariables.MAPSIZE; x++)
+                for (int y = 0; y < GlobalVariables.MAPSIZE; y++)
+                    for (int z = 0; z < GlobalVariables.MAPSIZE; z++)
                         sw.WriteLine((byte)blockList[x, y, z] + "," + (byte)blockCreatorTeam[x, y, z]);
             sw.Close();
             fs.Close();
@@ -338,7 +337,7 @@ namespace Infiniminer
 
         public void SetBlock(ushort x, ushort y, ushort z, BlockType blockType, PlayerTeam team)
         {
-            if (x <= 0 || y <= 0 || z <= 0 || x >= MAPSIZE - 1 || y >= MAPSIZE - 1 || z >= MAPSIZE - 1)
+            if (x <= 0 || y <= 0 || z <= 0 || x >= GlobalVariables.MAPSIZE - 1 || y >= GlobalVariables.MAPSIZE - 1 || z >= GlobalVariables.MAPSIZE - 1)
                 return;
 
             if (blockType == BlockType.BeaconRed || blockType == BlockType.BeaconBlue)
@@ -400,14 +399,14 @@ namespace Infiniminer
             banList = LoadBanList();
 
             // Create our block world, translating the coordinates out of the cave generator (where Z points down)
-            BlockType[, ,] worldData = CaveGenerator.GenerateCaveSystem(MAPSIZE, includeLava, oreFactor);
-            blockList = new BlockType[MAPSIZE, MAPSIZE, MAPSIZE];
-            blockCreatorTeam = new PlayerTeam[MAPSIZE, MAPSIZE, MAPSIZE];
-            for (ushort i = 0; i < MAPSIZE; i++)
-                for (ushort j = 0; j < MAPSIZE; j++)
-                    for (ushort k = 0; k < MAPSIZE; k++)
+            BlockType[, ,] worldData = CaveGenerator.GenerateCaveSystem(GlobalVariables.MAPSIZE, includeLava, oreFactor);
+            blockList = new BlockType[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE];
+            blockCreatorTeam = new PlayerTeam[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE];
+            for (ushort i = 0; i < GlobalVariables.MAPSIZE; i++)
+                for (ushort j = 0; j < GlobalVariables.MAPSIZE; j++)
+                    for (ushort k = 0; k < GlobalVariables.MAPSIZE; k++)
                     {
-                        blockList[i, (ushort)(MAPSIZE - 1 - k), j] = worldData[i, j, k];
+                        blockList[i, (ushort)(GlobalVariables.MAPSIZE - 1 - k), j] = worldData[i, j, k];
                         blockCreatorTeam[i, j, k] = PlayerTeam.None;
                     }
 
@@ -433,7 +432,7 @@ namespace Infiniminer
 
             // Calculate initial lava flows.
             ConsoleWrite("CALCULATING INITIAL LAVA FLOWS");
-            for (int i=0; i<MAPSIZE*2; i++)
+            for (int i=0; i<GlobalVariables.MAPSIZE*2; i++)
                 DoLavaStuff();
             ConsoleWrite("TOTAL LAVA BLOCKS = " + lavaBlockCount);
 
@@ -754,7 +753,7 @@ namespace Infiniminer
         {
             foreach (Player p in playerList.Values)
             {
-                if (p.Position.Y > 64 - InfiniminerGame.GROUND_LEVEL)
+                if (p.Position.Y > GlobalVariables.MAPSIZE - InfiniminerGame.GROUND_LEVEL)
                     DepositCash(p);
             }
 
@@ -768,16 +767,16 @@ namespace Infiniminer
 
         public void DoLavaStuff()
         {
-            bool[, ,] flowSleep = new bool[MAPSIZE, MAPSIZE, MAPSIZE]; //if true, do not calculate this turn
+            bool[, ,] flowSleep = new bool[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE]; //if true, do not calculate this turn
 
-            for (ushort i = 0; i < MAPSIZE; i++)
-                for (ushort j = 0; j < MAPSIZE; j++)
-                    for (ushort k = 0; k < MAPSIZE; k++)
+            for (ushort i = 0; i < GlobalVariables.MAPSIZE; i++)
+                for (ushort j = 0; j < GlobalVariables.MAPSIZE; j++)
+                    for (ushort k = 0; k < GlobalVariables.MAPSIZE; k++)
                         flowSleep[i, j, k] = false;
 
-            for (ushort i = 0; i < MAPSIZE; i++)
-                for (ushort j = 0; j < MAPSIZE; j++)
-                    for (ushort k = 0; k < MAPSIZE; k++)
+            for (ushort i = 0; i < GlobalVariables.MAPSIZE; i++)
+                for (ushort j = 0; j < GlobalVariables.MAPSIZE; j++)
+                    for (ushort k = 0; k < GlobalVariables.MAPSIZE; k++)
                         if (blockList[i, j, k] == BlockType.Lava && !flowSleep[i, j, k])
                         {
                             // RULES FOR LAVA EXPANSION:
@@ -805,12 +804,12 @@ namespace Infiniminer
                                     SetBlock(i, j, (ushort)(k - 1), BlockType.Lava, PlayerTeam.None);
                                     flowSleep[i, j, k - 1] = true;
                                 }
-                                if (i < MAPSIZE - 1 && blockList[i + 1, j, k] == BlockType.None)
+                                if (i < GlobalVariables.MAPSIZE - 1 && blockList[i + 1, j, k] == BlockType.None)
                                 {
                                     SetBlock((ushort)(i + 1), j, k, BlockType.Lava, PlayerTeam.None);
                                     flowSleep[i + 1, j, k] = true;
                                 }
-                                if (k < MAPSIZE - 1 && blockList[i, j, k+1] == BlockType.None)
+                                if (k < GlobalVariables.MAPSIZE - 1 && blockList[i, j, k+1] == BlockType.None)
                                 {
                                     SetBlock(i, j, (ushort)(k + 1), BlockType.Lava, PlayerTeam.None);
                                     flowSleep[i, j, k + 1] = true;
@@ -824,7 +823,7 @@ namespace Infiniminer
             ushort x = (ushort)point.X;
             ushort y = (ushort)point.Y;
             ushort z = (ushort)point.Z;
-            if (x <= 0 || y <= 0 || z <= 0 || x >= MAPSIZE - 1 || y >= MAPSIZE - 1 || z >= MAPSIZE - 1)
+            if (x <= 0 || y <= 0 || z <= 0 || x >= GlobalVariables.MAPSIZE - 1 || y >= GlobalVariables.MAPSIZE - 1 || z >= GlobalVariables.MAPSIZE - 1)
                 return BlockType.None;
             return blockList[x, y, z];
         }
@@ -927,9 +926,9 @@ namespace Infiniminer
 
         //private bool LocationNearBase(ushort x, ushort y, ushort z)
         //{
-        //    for (int i=0; i<MAPSIZE; i++)
-        //        for (int j=0; j<MAPSIZE; j++)
-        //            for (int k = 0; k < MAPSIZE; k++)
+        //    for (int i=0; i<GlobalVariables.MAPSIZE; i++)
+        //        for (int j=0; j<GlobalVariables.MAPSIZE; j++)
+        //            for (int k = 0; k < GlobalVariables.MAPSIZE; k++)
         //                if (blockList[i, j, k] == BlockType.HomeBlue || blockList[i, j, k] == BlockType.HomeRed)
         //                {
         //                    double dist = Math.Sqrt(Math.Pow(x - i, 2) + Math.Pow(y - j, 2) + Math.Pow(z - k, 2));
@@ -967,7 +966,7 @@ namespace Infiniminer
             }
 
             // If it's out of bounds, bail.
-            if (x <= 0 || y <= 0 || z <= 0 || x >= MAPSIZE - 1 || y >= MAPSIZE - 1 || z >= MAPSIZE - 1)
+            if (x <= 0 || y <= 0 || z <= 0 || x >= GlobalVariables.MAPSIZE - 1 || y >= GlobalVariables.MAPSIZE - 1 || z >= GlobalVariables.MAPSIZE - 1)
                 actionFailed = true;
 
             // If it's near a base, bail.
@@ -1100,7 +1099,7 @@ namespace Infiniminer
                     for (int dz = -2; dz <= 2; dz++)
                     {
                         // Check that this is a sane block position.
-                        if (x + dx <= 0 || y + dy <= 0 || z + dz <= 0 || x + dx >= MAPSIZE - 1 || y + dy >= MAPSIZE - 1 || z + dz >= MAPSIZE - 1)
+                        if (x + dx <= 0 || y + dy <= 0 || z + dz <= 0 || x + dx >= GlobalVariables.MAPSIZE - 1 || y + dy >= GlobalVariables.MAPSIZE - 1 || z + dz >= GlobalVariables.MAPSIZE - 1)
                             continue;
 
                         // Chain reactions!
@@ -1255,17 +1254,15 @@ namespace Infiniminer
 
         public void SendCurrentMap(NetConnection client)
         {
-            Debug.Assert(MAPSIZE == 64, "The BlockBulkTransfer message requires a map size of 64.");
-            
-            for (byte x = 0; x < MAPSIZE; x++)
-                for (byte y=0; y<MAPSIZE; y+=16)
+            for (byte x = 0; x < GlobalVariables.MAPSIZE; x++)
+                for (byte y=0; y< GlobalVariables.MAPSIZE; y+= GlobalVariables.PACKETSIZE)
                 {
                     NetBuffer msgBuffer = netServer.CreateBuffer();
                     msgBuffer.Write((byte)InfiniminerMessage.BlockBulkTransfer);
                     msgBuffer.Write(x);
                     msgBuffer.Write(y);
-                    for (byte dy=0; dy<16; dy++)
-                        for (byte z = 0; z < MAPSIZE; z++)
+                    for (byte dy = 0; dy < GlobalVariables.PACKETSIZE; dy++)
+                        for (byte z = 0; z < GlobalVariables.MAPSIZE; z++)
                             msgBuffer.Write((byte)(blockList[x, y+dy, z]));
                     if (client.Status == NetConnectionStatus.Connected)
                         netServer.SendMessage(msgBuffer, client, NetChannel.ReliableUnordered);
