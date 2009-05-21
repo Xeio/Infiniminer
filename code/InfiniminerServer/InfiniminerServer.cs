@@ -15,7 +15,6 @@ namespace Infiniminer
         BlockType[, ,] blockList = null;    // In game coordinates, where Y points up.
         PlayerTeam[, ,] blockCreatorTeam = null;
         Dictionary<NetConnection, Player> playerList = new Dictionary<NetConnection, Player>();
-        int lavaBlockCount = 0;
         uint oreFactor = 10;
         bool publicServer = false;
         uint maxPlayers = 16;
@@ -42,6 +41,15 @@ namespace Infiniminer
         // Server restarting variables.
         DateTime restartTime = DateTime.Now;
         bool restartTriggered = false;
+
+        //All the lava blocks on the map
+        //This could be a hashSet, but we're using .NET 2.0
+        Dictionary<Point3D, byte> LavaBlocks = new Dictionary<Point3D,byte>();
+        //3D point of 3 ushorts
+        public struct Point3D
+        {
+            public ushort X, Y, Z;
+        }
 
         public InfiniminerServer()
         {
@@ -253,6 +261,7 @@ namespace Infiniminer
                             {
                                 FileStream fs = new FileStream(args[1], FileMode.Open);
                                 StreamReader sr = new StreamReader(fs);
+                                LavaBlocks.Clear();
                                 for (int x = 0; x < GlobalVariables.MAPSIZE; x++)
                                     for (int y = 0; y < GlobalVariables.MAPSIZE; y++)
                                         for (int z = 0; z < GlobalVariables.MAPSIZE; z++)
@@ -262,6 +271,8 @@ namespace Infiniminer
                                             if (fileArgs.Length == 2)
                                             {
                                                 blockList[x, y, z] = (BlockType)int.Parse(fileArgs[0], System.Globalization.CultureInfo.InvariantCulture);
+                                                if (blockList[x, y, z] == BlockType.Lava)
+                                                    LavaBlocks.Add(new Point3D() { X = (ushort)x, Y = (ushort)y, Z = (ushort)z }, 0);
                                                 blockCreatorTeam[x, y, z] = (PlayerTeam)int.Parse(fileArgs[1], System.Globalization.CultureInfo.InvariantCulture);
                                             }
                                         }
@@ -337,8 +348,9 @@ namespace Infiniminer
 
         public void SetBlock(ushort x, ushort y, ushort z, BlockType blockType, PlayerTeam team)
         {
-            if (x <= 0 || y <= 0 || z <= 0 || x >= GlobalVariables.MAPSIZE - 1 || y >= GlobalVariables.MAPSIZE - 1 || z >= GlobalVariables.MAPSIZE - 1)
+            if (x < 0 || y < 0 || z < 0 || x >= GlobalVariables.MAPSIZE || y >= GlobalVariables.MAPSIZE || z >= GlobalVariables.MAPSIZE)
                 return;
+            var oldBlockType = blockList[x, y, z];
 
             if (blockType == BlockType.BeaconRed || blockType == BlockType.BeaconBlue)
             {
@@ -370,8 +382,14 @@ namespace Infiniminer
                 if (netConn.Status == NetConnectionStatus.Connected)
                     netServer.SendMessage(msgBuffer, netConn, NetChannel.ReliableUnordered);
 
-            if (blockType == BlockType.Lava)
-                lavaBlockCount += 1;
+            if (oldBlockType == BlockType.Lava && blockType != BlockType.Lava)
+            {
+                LavaBlocks.Remove(new Point3D() { X = x, Y = y, Z = z });
+            }
+            else if (blockType == BlockType.Lava && oldBlockType != BlockType.Lava)
+            {
+                LavaBlocks.Add(new Point3D() { X = x, Y = y, Z = z }, 0);
+            }
             
             //ConsoleWrite("BLOCKSET: " + x + " " + y + " " + z + " " + blockType.ToString());
         }
@@ -399,7 +417,7 @@ namespace Infiniminer
             banList = LoadBanList();
 
             // Create our block world, translating the coordinates out of the cave generator (where Z points down)
-            BlockType[, ,] worldData = CaveGenerator.GenerateCaveSystem(GlobalVariables.MAPSIZE, includeLava, oreFactor);
+            BlockType[, ,] worldData = CaveGenerator.GenerateCaveSystem(GlobalVariables.MAPSIZE, includeLava, oreFactor, ref LavaBlocks);
             blockList = new BlockType[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE];
             blockCreatorTeam = new PlayerTeam[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE];
             for (ushort i = 0; i < GlobalVariables.MAPSIZE; i++)
@@ -432,9 +450,8 @@ namespace Infiniminer
 
             // Calculate initial lava flows.
             ConsoleWrite("CALCULATING INITIAL LAVA FLOWS");
-            for (int i=0; i<GlobalVariables.MAPSIZE*2; i++)
-                DoLavaStuff();
-            ConsoleWrite("TOTAL LAVA BLOCKS = " + lavaBlockCount);
+            while (DoLavaStuff()) ;
+            ConsoleWrite("TOTAL LAVA BLOCKS = " + LavaBlocks.Count);
 
             // Send the initial server list update.
             PublicServerListUpdate();
@@ -765,57 +782,53 @@ namespace Infiniminer
                 winningTeam = PlayerTeam.Red;
         }
 
-        public void DoLavaStuff()
+        public bool DoLavaStuff()
         {
-            bool[, ,] flowSleep = new bool[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE]; //if true, do not calculate this turn
+            //Temporary list of new blocks, we don't add them immediately so they aren't
+            //we only make one lave step per run.
+            List<Point3D> tempLava = new List<Point3D>();
+            foreach (var blockposition in LavaBlocks.Keys)
+            {
+                ushort i = blockposition.X,
+                    j = blockposition.Y,
+                    k = blockposition.Z;
+                // RULES FOR LAVA EXPANSION:
+                // if the block below is lava, do nothing
+                // if the block below is empty space, add lava there
+                // if the block below is something solid, add lava to the sides
+                if (j == 0)
+                    continue;
+                BlockType typeBelow = blockList[i, j - 1, k];
+                if (typeBelow == BlockType.None)
+                {
+                    tempLava.Add(new Point3D() { X = i, Y = (ushort)(j - 1), Z = k });
+                }
+                else if (typeBelow != BlockType.Lava)
+                {
+                    if (i > 0 && blockList[i - 1, j, k] == BlockType.None)
+                        tempLava.Add(new Point3D() { X = (ushort)(i - 1), Y = j, Z = k });
+                    if (k > 0 && blockList[i, j, k - 1] == BlockType.None)
+                        tempLava.Add(new Point3D() { X = i, Y = j, Z = (ushort)(k - 1) });
+                    if (i < GlobalVariables.MAPSIZE - 1 && blockList[i + 1, j, k] == BlockType.None)
+                        tempLava.Add(new Point3D() { X = (ushort)(i + 1), Y = j, Z = k });
+                    if (k < GlobalVariables.MAPSIZE - 1 && blockList[i, j, k + 1] == BlockType.None)
+                        tempLava.Add(new Point3D() { X = i, Y = j, Z = (ushort)(k + 1) });
+                }
+            }
 
-            for (ushort i = 0; i < GlobalVariables.MAPSIZE; i++)
-                for (ushort j = 0; j < GlobalVariables.MAPSIZE; j++)
-                    for (ushort k = 0; k < GlobalVariables.MAPSIZE; k++)
-                        flowSleep[i, j, k] = false;
-
-            for (ushort i = 0; i < GlobalVariables.MAPSIZE; i++)
-                for (ushort j = 0; j < GlobalVariables.MAPSIZE; j++)
-                    for (ushort k = 0; k < GlobalVariables.MAPSIZE; k++)
-                        if (blockList[i, j, k] == BlockType.Lava && !flowSleep[i, j, k])
-                        {
-                            // RULES FOR LAVA EXPANSION:
-                            // if the block below is lava, do nothing
-                            // if the block below is empty space, add lava there
-                            // if the block below is something solid, add lava to the sides
-                            BlockType typeBelow = (j == 0) ? BlockType.Lava : blockList[i, j - 1, k];
-                            if (typeBelow == BlockType.None)
-                            {
-                                if (j > 0)
-                                {
-                                    SetBlock(i, (ushort)(j - 1), k, BlockType.Lava, PlayerTeam.None);
-                                    flowSleep[i, j - 1, k] = true;
-                                }
-                            }
-                            else if (typeBelow != BlockType.Lava)
-                            {
-                                if (i > 0 && blockList[i-1, j, k] == BlockType.None)
-                                {
-                                    SetBlock((ushort)(i - 1), j, k, BlockType.Lava, PlayerTeam.None);
-                                    flowSleep[i - 1, j, k] = true;
-                                }
-                                if (k > 0 && blockList[i, j, k-1] == BlockType.None)
-                                {
-                                    SetBlock(i, j, (ushort)(k - 1), BlockType.Lava, PlayerTeam.None);
-                                    flowSleep[i, j, k - 1] = true;
-                                }
-                                if (i < GlobalVariables.MAPSIZE - 1 && blockList[i + 1, j, k] == BlockType.None)
-                                {
-                                    SetBlock((ushort)(i + 1), j, k, BlockType.Lava, PlayerTeam.None);
-                                    flowSleep[i + 1, j, k] = true;
-                                }
-                                if (k < GlobalVariables.MAPSIZE - 1 && blockList[i, j, k+1] == BlockType.None)
-                                {
-                                    SetBlock(i, j, (ushort)(k + 1), BlockType.Lava, PlayerTeam.None);
-                                    flowSleep[i, j, k + 1] = true;
-                                }
-                            }
-                        }
+            //Keep track of if we changed anything
+            bool changedstuff = false;
+            //Add the temporary lava blocks to the list
+            foreach (var newLavaPoint in tempLava)
+            {
+                //Makes sure we don't try to add a block twice (if it is both below/next to already existing lava)
+                if (!LavaBlocks.ContainsKey(newLavaPoint))
+                {
+                    SetBlock(newLavaPoint.X, newLavaPoint.Y, newLavaPoint.Z, BlockType.Lava, PlayerTeam.None);
+                    changedstuff = true;
+                }
+            }
+            return changedstuff;
         }
 
         public BlockType BlockAtPoint(Vector3 point)
