@@ -46,7 +46,7 @@ namespace Infiniminer
         //This could be a hashSet, but we're using .NET 2.0
         Dictionary<Point3D, byte> LavaBlocks = new Dictionary<Point3D,byte>();
         //3D point of 3 ushorts
-        public struct Point3D
+        struct Point3D
         {
             public ushort X, Y, Z;
         }
@@ -388,8 +388,6 @@ namespace Infiniminer
             }
             else if (blockType == BlockType.Lava && oldBlockType != BlockType.Lava)
             {
-                if (y > GlobalVariables.MAPSIZE)
-                    y = y;
                 LavaBlocks.Add(new Point3D() { X = x, Y = y, Z = z }, 0);
             }
             
@@ -419,7 +417,7 @@ namespace Infiniminer
             banList = LoadBanList();
 
             // Create our block world, translating the coordinates out of the cave generator (where Z points down)
-            BlockType[, ,] worldData = CaveGenerator.GenerateCaveSystem(GlobalVariables.MAPSIZE, includeLava, oreFactor, ref LavaBlocks);
+            BlockType[, ,] worldData = CaveGenerator.GenerateCaveSystem(GlobalVariables.MAPSIZE, includeLava, oreFactor);
             blockList = new BlockType[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE];
             blockCreatorTeam = new PlayerTeam[GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE, GlobalVariables.MAPSIZE];
             for (ushort i = 0; i < GlobalVariables.MAPSIZE; i++)

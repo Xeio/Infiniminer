@@ -21,7 +21,7 @@ namespace Infiniminer
         private static Random randGen = new Random();
 
         // Create a cave system.
-        public static BlockType[, ,] GenerateCaveSystem(int size, bool includeLava, uint oreFactor, ref Dictionary<InfiniminerServer.Point3D,byte> lavaBlocks)
+        public static BlockType[, ,] GenerateCaveSystem(int size, bool includeLava, uint oreFactor)
         {
             float gradientStrength = (float)randGen.NextDouble();
             BlockType[, ,] caveData = CaveGenerator.GenerateConstant(size, BlockType.Dirt);
@@ -75,7 +75,7 @@ namespace Infiniminer
 
             // Add lava.
             if (includeLava)
-                AddLava(ref caveData, size, ref lavaBlocks);
+                AddLava(ref caveData, size);
 
             // Add starting positions.
             //AddStartingPosition(ref caveData, size, size - 5, size - 5, InfiniminerGame.GROUND_LEVEL, BlockType.HomeRed);
@@ -132,7 +132,7 @@ namespace Infiniminer
             }
         }
 
-        public static void AddLava(ref BlockType[, ,] data, int size, ref Dictionary<InfiniminerServer.Point3D, byte> lavaBlocks)
+        public static void AddLava(ref BlockType[, ,] data, int size)
         {
             int numFlows = randGen.Next(size / 16, size / 2);
             while (numFlows > 0)
