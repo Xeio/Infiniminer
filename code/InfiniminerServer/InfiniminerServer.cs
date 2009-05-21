@@ -388,6 +388,8 @@ namespace Infiniminer
             }
             else if (blockType == BlockType.Lava && oldBlockType != BlockType.Lava)
             {
+                if (y > GlobalVariables.MAPSIZE)
+                    y = y;
                 LavaBlocks.Add(new Point3D() { X = x, Y = y, Z = z }, 0);
             }
             
@@ -425,6 +427,8 @@ namespace Infiniminer
                     for (ushort k = 0; k < GlobalVariables.MAPSIZE; k++)
                     {
                         blockList[i, (ushort)(GlobalVariables.MAPSIZE - 1 - k), j] = worldData[i, j, k];
+                        if(blockList[i, (ushort)(GlobalVariables.MAPSIZE - 1 - k), j] == BlockType.Lava)
+                            LavaBlocks.Add(new InfiniminerServer.Point3D() { X = (ushort)i, Y = (ushort)(GlobalVariables.MAPSIZE - 1 - k), Z = (ushort)j }, 0);
                         blockCreatorTeam[i, j, k] = PlayerTeam.None;
                     }
 

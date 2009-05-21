@@ -160,7 +160,6 @@ namespace Infiniminer
                 {
                     data[x, y, z] = BlockType.Rock;
                     data[x, y, z+1] = BlockType.Lava;
-                    lavaBlocks.Add(new InfiniminerServer.Point3D() { X = (ushort)x, Y = (ushort)y, Z = (ushort)(z + 1) }, 0);
                     numFlows -= 1;
                 }
             }
