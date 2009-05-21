@@ -1274,11 +1274,23 @@ namespace Infiniminer
                 {
                     NetBuffer msgBuffer = netServer.CreateBuffer();
                     msgBuffer.Write((byte)InfiniminerMessage.BlockBulkTransfer);
-                    msgBuffer.Write(x);
-                    msgBuffer.Write(y);
+
+                    //Compress the data so we don't use as much bandwith
+                    var compressedstream = new System.IO.MemoryStream();
+                    var uncompressed = new System.IO.MemoryStream();
+                    var compresser = new System.IO.Compression.GZipStream(compressedstream, System.IO.Compression.CompressionMode.Compress);
+                    //Write everything we want to compress to the uncompressed stream
+                    uncompressed.WriteByte(x);
+                    uncompressed.WriteByte(y);
                     for (byte dy = 0; dy < GlobalVariables.PACKETSIZE; dy++)
                         for (byte z = 0; z < GlobalVariables.MAPSIZE; z++)
-                            msgBuffer.Write((byte)(blockList[x, y+dy, z]));
+                            uncompressed.WriteByte((byte)(blockList[x, y + dy, z]));
+                    //Compress the input
+                    compresser.Write(uncompressed.ToArray(), 0, (int)uncompressed.Length);
+                    compresser.Close();
+
+                    //Send the compressed data
+                    msgBuffer.Write(compressedstream.ToArray());
                     if (client.Status == NetConnectionStatus.Connected)
                         netServer.SendMessage(msgBuffer, client, NetChannel.ReliableUnordered);
                 }
